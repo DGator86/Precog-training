@@ -24,12 +24,29 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior-y: contain;
+  min-height: 100%;
+}
+
+/* Comfortable touch behaviour on phones */
+button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .app {
   max-width: 680px;
   margin: 0 auto;
-  padding: clamp(20px, 5vw, 48px) 18px 64px;
+  /* Respect notches / rounded corners via safe-area insets */
+  padding:
+    calc(clamp(20px, 5vw, 48px) + env(safe-area-inset-top))
+    calc(18px + env(safe-area-inset-right))
+    calc(64px + env(safe-area-inset-bottom))
+    calc(18px + env(safe-area-inset-left));
 }
 
 .head { text-align: center; margin-bottom: 26px; }
@@ -60,10 +77,10 @@ html, body {
 
 .symbol-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* Fluidly fits 5 across on desktop, 3 on phones — no fixed breakpoints */
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
   gap: 10px;
 }
-@media (max-width: 460px) { .symbol-grid { grid-template-columns: repeat(3, 1fr); } }
 
 .symbol {
   appearance: none;
@@ -72,9 +89,11 @@ html, body {
   color: var(--ink);
   border-radius: 12px;
   padding: 12px 6px;
+  min-height: 72px; /* comfortable touch target */
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 7px;
   cursor: pointer;
   transition: transform 0.08s ease, border-color 0.15s ease, background 0.15s ease;
@@ -173,3 +192,30 @@ html, body {
 .foot { color: var(--ink-dim); font-size: 0.84rem; text-align: center; margin-top: 8px; }
 .foot code { background: #11182a; padding: 1px 6px; border-radius: 6px; }
 .foot .caution { margin-top: 6px; opacity: 0.85; }
+
+/* ---------- Phones ---------- */
+@media (max-width: 480px) {
+  .card { padding: 18px 16px; }
+
+  /* Stack actions full-width so they're easy to tap */
+  .actions { flex-direction: column; gap: 10px; }
+  .actions .btn { width: 100%; min-height: 50px; }
+
+  .history-actions { flex-direction: column; }
+  .history-actions .btn { width: 100%; min-height: 48px; }
+
+  .stage { min-height: 200px; }
+  .reveal .slot .glyph { font-size: 2rem; }
+  .trial-list .meta { display: none; } /* avoid cramped overflow on narrow screens */
+}
+
+/* Larger glyphs but tidy labels on the smallest screens */
+@media (max-width: 360px) {
+  .symbol-grid { grid-template-columns: repeat(3, 1fr); }
+  .symbol { font-size: 0.68rem; }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
