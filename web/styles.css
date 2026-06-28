@@ -70,6 +70,36 @@ button {
   box-shadow: var(--shadow);
 }
 
+/* ---------- Tabs ---------- */
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  background: #11142099;
+  border: 1px solid var(--card-line);
+  border-radius: 13px;
+  padding: 5px;
+}
+.tab {
+  flex: 1;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding: 10px 6px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+.tab.active {
+  background: var(--accent-soft);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
 /* ---------- Stage ---------- */
 .stage { min-height: 220px; }
 .stage h2 { margin: 0 0 4px; font-size: 1.15rem; }
@@ -81,6 +111,11 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
   gap: 10px;
 }
+
+/* Up / Down: two large side-by-side targets */
+.symbol-grid.pair { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.symbol-grid.pair .symbol { min-height: 120px; font-size: 0.95rem; gap: 10px; }
+.symbol-grid.pair .glyph { font-size: 2.6rem; }
 
 .symbol {
   appearance: none;
