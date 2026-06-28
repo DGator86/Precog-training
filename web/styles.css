@@ -100,7 +100,6 @@ button {
   font-size: 0.72rem;
 }
 .symbol .glyph { font-size: 1.7rem; line-height: 1; }
-.symbol:hover { border-color: var(--accent); transform: translateY(-2px); }
 .symbol.selected {
   border-color: var(--accent);
   background: var(--accent-soft);
@@ -122,16 +121,21 @@ button {
 }
 .btn:active { transform: translateY(1px); }
 .btn.primary { background: var(--accent); color: #0c0e16; }
-.btn.primary:hover { background: #9b8eff; }
 .btn.ghost {
   background: transparent;
   border: 1px solid var(--card-line);
   color: var(--ink);
 }
-.btn.ghost:hover { border-color: var(--accent); }
 .btn.danger { color: var(--miss); border-color: #45283a; }
-.btn.danger:hover { border-color: var(--miss); }
 .btn:disabled { opacity: 0.4; cursor: default; }
+
+/* Hover effects only on real pointers, so touch never leaves a sticky highlight */
+@media (hover: hover) and (pointer: fine) {
+  .symbol:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .btn.primary:hover { background: #9b8eff; }
+  .btn.ghost:hover { border-color: var(--accent); }
+  .btn.danger:hover { border-color: var(--miss); }
+}
 
 .locked-note {
   display: flex; align-items: center; gap: 10px;
