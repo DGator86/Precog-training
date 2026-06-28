@@ -7,41 +7,92 @@
  *  - Only at reveal is the target generated, using crypto-strength randomness
  *    drawn AFTER the guess was locked. Nothing exists to peek at while open.
  *
- * State lives entirely in localStorage; there is no server.
+ * Three modules share the protocol but differ in their target pool:
+ *  - shapes:  10 symbols      (chance 10%)
+ *  - numbers: 1..10           (chance 10%)
+ *  - updown:  up / down       (chance 50%)
+ *
+ * State lives entirely in localStorage; there is no server. Each module keeps
+ * its own independent history.
  */
 
 "use strict";
 
-const STORAGE_KEY = "esp_trainer.trials.v1";
+/* ---------- module definitions ---------- */
+// Each target: { value (stored/compared), glyph (big display), label (caption) }
 
-const TARGETS = [
-  { name: "circle",    glyph: "⬤" },
-  { name: "square",    glyph: "◼" },
-  { name: "triangle",  glyph: "▲" },
-  { name: "star",      glyph: "★" },
-  { name: "cross",     glyph: "✚" },
-  { name: "spiral",    glyph: "🌀" },
-  { name: "crescent",  glyph: "☾" },
-  { name: "diamond",   glyph: "◆" },
-  { name: "hexagon",   glyph: "⬡" },
-  { name: "wavy line", glyph: "〰" },
-];
+const MODULES = {
+  shapes: {
+    id: "shapes",
+    tab: "Shapes",
+    title: "Shapes",
+    storageKey: "esp_trainer.trials.v1",
+    targets: [
+      { value: "circle",    glyph: "⬤",  label: "circle" },
+      { value: "square",    glyph: "◼",  label: "square" },
+      { value: "triangle",  glyph: "▲",  label: "triangle" },
+      { value: "star",      glyph: "★",  label: "star" },
+      { value: "cross",     glyph: "✚",  label: "cross" },
+      { value: "spiral",    glyph: "🌀", label: "spiral" },
+      { value: "crescent",  glyph: "☾",  label: "crescent" },
+      { value: "diamond",   glyph: "◆",  label: "diamond" },
+      { value: "hexagon",   glyph: "⬡",  label: "hexagon" },
+      { value: "wavy line", glyph: "〰", label: "wavy line" },
+    ],
+    layout: "grid",
+  },
+  numbers: {
+    id: "numbers",
+    tab: "Numbers",
+    title: "Numbers 1–10",
+    storageKey: "esp_trainer.trials.numbers.v1",
+    targets: Array.from({ length: 10 }, (_, i) => ({
+      value: String(i + 1),
+      glyph: String(i + 1),
+      label: "",
+    })),
+    layout: "grid",
+  },
+  updown: {
+    id: "updown",
+    tab: "Up / Down",
+    title: "Up or Down",
+    storageKey: "esp_trainer.trials.updown.v1",
+    targets: [
+      { value: "up",   glyph: "▲", label: "Up" },
+      { value: "down", glyph: "▼", label: "Down" },
+    ],
+    layout: "pair",
+  },
+};
 
-const GLYPH = Object.fromEntries(TARGETS.map((t) => [t.name, t.glyph]));
+const ACTIVE_KEY = "esp_trainer.activeModule";
 
-/* ---------- storage ---------- */
+let activeId = localStorage.getItem(ACTIVE_KEY);
+if (!MODULES[activeId]) activeId = "shapes";
+
+function mod() {
+  return MODULES[activeId];
+}
+
+function glyphFor(value) {
+  const t = mod().targets.find((x) => x.value === value);
+  return t ? t.glyph : "?";
+}
+
+/* ---------- storage (per module) ---------- */
 
 function loadTrials() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(mod().storageKey);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-function saveTrials(trials) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(trials));
+function saveTrials(t) {
+  localStorage.setItem(mod().storageKey, JSON.stringify(t));
 }
 
 let trials = loadTrials();
@@ -59,7 +110,8 @@ function openTrial() {
 
 // Unbiased pick of one target using the Web Crypto API (rejection sampling).
 function secretTarget() {
-  const n = TARGETS.length;
+  const pool = mod().targets;
+  const n = pool.length;
   const limit = Math.floor(256 / n) * n; // largest multiple of n <= 256
   const buf = new Uint8Array(1);
   let r;
@@ -67,7 +119,7 @@ function secretTarget() {
     crypto.getRandomValues(buf);
     r = buf[0];
   } while (r >= limit);
-  return TARGETS[r % n].name;
+  return pool[r % n].value;
 }
 
 /* ---------- stats ---------- */
@@ -93,15 +145,15 @@ function binomialTail(k, n, p) {
   return Math.min(total, 1);
 }
 
-/* ---------- rendering ---------- */
+/* ---------- elements ---------- */
 
+const tabsEl = document.getElementById("tabs");
 const stageEl = document.getElementById("stage");
 const statGridEl = document.getElementById("statGrid");
 const interpEl = document.getElementById("interp");
 const trialListEl = document.getElementById("trialList");
 
 let countdownTimer = null;
-
 function clearCountdown() {
   if (countdownTimer) {
     clearInterval(countdownTimer);
@@ -109,12 +161,32 @@ function clearCountdown() {
   }
 }
 
-function symbolButton(t, { selected = false, disabled = false } = {}) {
-  return `
-    <button class="symbol${selected ? " selected" : ""}" data-name="${t.name}" ${disabled ? "disabled" : ""}>
-      <span class="glyph">${t.glyph}</span>
-      <span>${t.name}</span>
-    </button>`;
+/* ---------- rendering ---------- */
+
+function renderTabs() {
+  tabsEl.innerHTML = Object.values(MODULES)
+    .map(
+      (m) =>
+        `<button class="tab${m.id === activeId ? " active" : ""}" data-mod="${m.id}" type="button">${m.tab}</button>`
+    )
+    .join("");
+  tabsEl.querySelectorAll(".tab").forEach((b) => {
+    b.onclick = () => switchModule(b.dataset.mod);
+  });
+}
+
+function pickerMarkup() {
+  const cls = mod().layout === "pair" ? "symbol-grid pair" : "symbol-grid";
+  const buttons = mod()
+    .targets.map(
+      (t) => `
+      <button class="symbol" data-value="${t.value}" type="button">
+        <span class="glyph">${t.glyph}</span>
+        ${t.label ? `<span>${t.label}</span>` : ""}
+      </button>`
+    )
+    .join("");
+  return `<div class="${cls}" id="symGrid">${buttons}</div>`;
 }
 
 function renderStage() {
@@ -133,13 +205,10 @@ function renderStage() {
   }
 
   if (trial.guess == null) {
-    // Awaiting a locked guess.
     stageEl.innerHTML = `
       <h2>Trial #${trial.id} — lock your perception</h2>
-      <p class="sub">Pick the symbol you sense. Once locked it cannot be changed.</p>
-      <div class="symbol-grid" id="symGrid">
-        ${TARGETS.map((t) => symbolButton(t)).join("")}
-      </div>
+      <p class="sub">Pick the ${mod().layout === "pair" ? "direction" : "option"} you sense. Once locked it cannot be changed.</p>
+      ${pickerMarkup()}
       <div class="actions">
         <button class="btn primary" id="lockBtn" type="button" disabled>Lock guess</button>
         <button class="btn ghost" id="discardBtn" type="button">Discard</button>
@@ -150,13 +219,13 @@ function renderStage() {
     const lockBtn = document.getElementById("lockBtn");
     grid.querySelectorAll(".symbol").forEach((b) => {
       b.onclick = () => {
-        picked = b.dataset.name;
+        picked = b.dataset.value;
         grid.querySelectorAll(".symbol").forEach((x) => x.classList.remove("selected"));
         b.classList.add("selected");
         lockBtn.disabled = false;
       };
     });
-    lockBtn.onclick = () => picked && lockGuess(picked);
+    lockBtn.onclick = () => picked != null && lockGuess(picked);
     document.getElementById("discardBtn").onclick = discardTrial;
     return;
   }
@@ -168,7 +237,7 @@ function renderStage() {
     <h2>Trial #${trial.id} — guess locked</h2>
     <p class="sub">Your perception is sealed. Reveal generates the target with fresh randomness.</p>
     <div class="locked-note">
-      <span class="glyph" style="font-size:1.4rem">${GLYPH[trial.guess] || "?"}</span>
+      <span class="glyph" style="font-size:1.4rem">${glyphFor(trial.guess)}</span>
       <span>Locked guess: <strong>${trial.guess}</strong></span>
     </div>
     <div class="actions">
@@ -215,12 +284,12 @@ function renderRevealResult(trial) {
     <div class="reveal">
       <div class="slot">
         <div class="label">Your guess</div>
-        <div class="glyph">${GLYPH[trial.guess] || "?"}</div>
+        <div class="glyph">${glyphFor(trial.guess)}</div>
         <div class="name">${trial.guess}</div>
       </div>
       <div class="slot">
         <div class="label">Target</div>
-        <div class="glyph">${GLYPH[trial.target] || "?"}</div>
+        <div class="glyph">${glyphFor(trial.target)}</div>
         <div class="name">${trial.target}</div>
       </div>
     </div>
@@ -235,7 +304,7 @@ function renderStats() {
   const done = trials.filter((t) => t.revealed_at != null);
   const n = done.length;
   const hits = done.reduce((s, t) => s + (t.hit || 0), 0);
-  const chance = 1 / TARGETS.length;
+  const chance = 1 / mod().targets.length;
   const rate = n ? hits / n : 0;
   const expected = n * chance;
   const p = n ? binomialTail(hits, n, chance) : NaN;
@@ -252,7 +321,7 @@ function renderStats() {
 
   if (!n) {
     interpEl.className = "interp";
-    interpEl.textContent = `Chance is ${(chance * 100).toFixed(0)}% (1 of ${TARGETS.length} symbols). No completed trials yet.`;
+    interpEl.textContent = `Chance is ${(chance * 100).toFixed(0)}% (1 of ${mod().targets.length}). No completed trials yet.`;
     return;
   }
   if (p < 0.05 && hits > expected) {
@@ -277,7 +346,7 @@ function renderHistory() {
       return `
         <li>
           <span class="pill ${hit ? "hit" : "miss"}">${hit ? "HIT" : "MISS"}</span>
-          <span>${GLYPH[t.guess] || "?"} ${t.guess} → ${GLYPH[t.target] || "?"} ${t.target}</span>
+          <span>${glyphFor(t.guess)} ${t.guess} → ${glyphFor(t.target)} ${t.target}</span>
           <span class="meta">#${t.id} · ${when}</span>
         </li>`;
     })
@@ -285,12 +354,21 @@ function renderHistory() {
 }
 
 function renderAll() {
+  renderTabs();
   renderStage();
   renderStats();
   renderHistory();
 }
 
 /* ---------- actions ---------- */
+
+function switchModule(id) {
+  if (!MODULES[id] || id === activeId) return;
+  activeId = id;
+  localStorage.setItem(ACTIVE_KEY, id);
+  trials = loadTrials();
+  renderAll();
+}
 
 function startTrial() {
   // Default: revealable immediately. The protocol's integrity comes from
@@ -299,7 +377,7 @@ function startTrial() {
   trials.push({
     id: nextId(),
     created_at: now,
-    reveal_after: now, // instant reveal in the web version
+    reveal_after: now,
     target: null,
     guess: null,
     guess_at: null,
@@ -310,10 +388,10 @@ function startTrial() {
   renderAll();
 }
 
-function lockGuess(name) {
+function lockGuess(value) {
   const trial = openTrial();
   if (!trial || trial.guess != null) return;
-  trial.guess = name;
+  trial.guess = value;
   trial.guess_at = Date.now();
   saveTrials(trials);
   renderAll();
@@ -341,17 +419,18 @@ function discardTrial() {
 }
 
 function exportJson() {
-  const blob = new Blob([JSON.stringify(trials, null, 2)], { type: "application/json" });
+  const payload = { module: activeId, trials };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "esp_trials.json";
+  a.download = `esp_trials_${activeId}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 function resetAll() {
-  if (!confirm("Delete all trials from this browser? This cannot be undone.")) return;
+  if (!confirm(`Delete all ${mod().tab} trials from this browser? This cannot be undone.`)) return;
   trials = [];
   saveTrials(trials);
   renderAll();

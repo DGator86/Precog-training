@@ -3,10 +3,20 @@
 A zero-build, fully client-side version of the trainer, designed to deploy to
 Vercel as a static site.
 
+## Modules
+
+Three tabs share the same protocol but use different target pools, each with
+its own independent history:
+
+- **Shapes** — 10 symbols (chance 10%).
+- **Numbers** — 1–10 (chance 10%).
+- **Up / Down** — a binary predictor (chance 50%).
+
 ## How it works
 
 - **No backend, no database.** Trials are stored in the browser's
-  `localStorage` under the key `esp_trainer.trials.v1`.
+  `localStorage`, one key per module (`esp_trainer.trials.v1`,
+  `esp_trainer.trials.numbers.v1`, `esp_trainer.trials.updown.v1`).
 - **Atemporal protocol preserved.** A trial is opened with no target. You lock
   a guess. The target is generated only at reveal time, using
   `crypto.getRandomValues` (unbiased rejection sampling) drawn *after* the
