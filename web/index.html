@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atemporal ESP Trainer</title>
+  <meta name="description" content="A blinded precognition / atemporal ESP trainer. Lock a perception before the target exists, then reveal and score against chance." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128302;</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="head">
+      <h1>Atemporal&nbsp;ESP&nbsp;Trainer</h1>
+      <p class="tag">Lock a perception before the target exists. Reveal. Score against chance.</p>
+    </header>
+
+    <!-- Stage: where the active trial happens -->
+    <section class="card stage" id="stage" aria-live="polite">
+      <!-- filled by app.js -->
+    </section>
+
+    <!-- Stats -->
+    <section class="card stats" id="stats">
+      <h2>Your record</h2>
+      <div class="stat-grid" id="statGrid"></div>
+      <p class="interp" id="interp"></p>
+    </section>
+
+    <details class="card history" id="historyWrap">
+      <summary>History &amp; data</summary>
+      <div class="history-actions">
+        <button class="btn ghost" id="exportBtn" type="button">Export JSON</button>
+        <button class="btn ghost danger" id="resetBtn" type="button">Reset all data</button>
+      </div>
+      <ul class="trial-list" id="trialList"></ul>
+    </details>
+
+    <footer class="foot">
+      <p>
+        The target is generated only at reveal time, with fresh randomness drawn
+        <em>after</em> your guess is locked. Nothing exists to peek at while a trial is open.
+        Your data stays in this browser (<code>localStorage</code>).
+      </p>
+      <p class="caution">A single run proves nothing — replicate before reading anything into it.</p>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
